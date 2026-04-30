@@ -1,15 +1,10 @@
-# Isopleth Fining Analysis & Plume Height Estimation
-Understanding curves of root-square area vs. maximum clast size
+# Weibull-Based Tephra Decay Models
+Inspired by Bonadonna & Costa (2013; https://doi.org/10.1007/s00445-013-0742-1).
 
 ## About the model
 - Estimate eruption plume height, and plume stability
 - An approach to Mass eruption rate (MER)
 - Understanding vent location and dispersal axis
-
-Inspired by Bonadonna & Costa (2013; https://doi.org/10.1007/s00445-013-0742-1).
-Isopleth fining records the ballistic and wind‑limited transport of clasts, shown by the systematic decrease in maximum clast size with increasing √Area as drag and buoyancy impose a distance‑dependent cutoff.
-
-# Weibull-Based Tephra Decay Models
 
 ## 1. Overview
 This repository applies the Weibull (Rosin–Rammler) functional form to describe the spatial decay of three tephra-fall properties:
@@ -53,7 +48,7 @@ Different eruption styles produce distinct contour geometries:
 
 Using sqrt(A) normalizes these geometric differences into a single decay coordinate.
 
-## 5. Weibull Equations (MathJax)
+## 5. Weibull Equations
 
 ### 5.1 Thickness
 $$
@@ -73,12 +68,6 @@ Md\phi(x) = \theta_{Md\phi} \left( \frac{x}{\lambda_{Md\phi}} \right)^{n_{Md\phi
 \exp\left[-\left( \frac{x}{\lambda_{Md\phi}} \right)^{n_{Md\phi}} \right]
 $$
 
-### General Form
-$$
-Y(x) = \theta \left( \frac{x}{\lambda} \right)^{n-2}
-\exp\left[-\left( \frac{x}{\lambda} \right)^{n} \right]
-$$
-
 where Y is thickness, ML, or Mdϕ.
 
 ## 6. Interpretation
@@ -86,6 +75,5 @@ where Y is thickness, ML, or Mdϕ.
 - n controls whether the curve behaves more like a power law (low n) or exponential (high n).
 - θ scales the overall magnitude of the deposit property.
 
-Together, these parameters provide a unified framework for reconstructing eruption size, column height, and transport dynamics.
 
 
