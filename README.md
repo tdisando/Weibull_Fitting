@@ -75,5 +75,24 @@ where Y is thickness, ML, or Mdϕ.
 - n controls whether the curve behaves more like a power law (low n) or exponential (high n).
 - θ scales the overall magnitude of the deposit property.
 
+## Rayleigh Case (n = 2)
+
+When the Weibull shape parameter equals n = 2, the decay law reduces to the
+Rayleigh form. In this case, the general Weibull equation becomes:
+
+$$
+Y(x) = \theta \exp\left[-\left(\frac{x}{\lambda}\right)^2\right]
+$$
+
+This applies to all three variables (thickness, maximum lithic size, and
+median grain size), since they share the same Weibull structure.
+
+### Implication
+A Rayleigh-type decay indicates smooth, Gaussian-like thinning consistent with
+a well-mixed umbrella cloud. This behavior is typical of Plinian or strong
+Subplinian eruptions, where turbulent mixing dominates over wind distortion
+and ballistic settling.
+
+
 
 
