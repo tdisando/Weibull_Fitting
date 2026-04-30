@@ -1,4 +1,4 @@
-# Isopleth_fining
+# Isopleth Fining Analysis & Plume Height Estimation
 Understanding curves of root-square area vs. maximum clast size
 
 ## About the model
