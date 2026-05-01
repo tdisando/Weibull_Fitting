@@ -93,6 +93,4 @@ a well-mixed umbrella cloud. This behavior is typical of Plinian or strong
 Subplinian eruptions, where turbulent mixing dominates over wind distortion
 and ballistic settling.
 
-
-
-
+*Made with ❤️ for the volcanology community*
