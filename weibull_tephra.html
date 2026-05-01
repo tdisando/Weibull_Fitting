@@ -1,0 +1,824 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Estimating Plume Height — Weibull Tephra</title>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js"></script>
+<style>
+@import url('https://fonts.googleapis.com/css2?family=IM+Fell+English:ital@0;1&family=DM+Mono:wght@300;400;500&display=swap');
+
+:root {
+  --bg:      #0d0f14;
+  --surface: #13161e;
+  --border:  #252932;
+  --accent:  #e8c87a;
+  --accent2: #7ab8e8;
+  --lava:    #e87a4a;
+  --violet:  #c47ae8;
+  --text:    #c8ccda;
+  --muted:   #5a606e;
+}
+
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+body {
+  background: var(--bg);
+  color: var(--text);
+  font-family: 'DM Mono', monospace;
+  font-size: 14px;
+  line-height: 1.65;
+  min-height: 100vh;
+}
+
+body::before {
+  content: '';
+  position: fixed; inset: 0;
+  background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 256 256' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)' opacity='0.04'/%3E%3C/svg%3E");
+  pointer-events: none; z-index: 0; opacity: .35;
+}
+
+.page {
+  position: relative; z-index: 1;
+  max-width: 1360px; margin: 0 auto;
+  padding: 2rem 1.5rem 4rem;
+}
+
+/* HEADER */
+header {
+  border-bottom: 1px solid var(--border);
+  padding-bottom: 1.4rem; margin-bottom: 1.8rem;
+}
+
+.badge {
+  display: inline-block;
+  font-size: 11px; letter-spacing: .16em; text-transform: uppercase;
+  color: var(--accent); border: 1px solid var(--accent);
+  padding: 2px 9px; border-radius: 2px; margin-bottom: .65rem;
+}
+
+h1 {
+  font-family: 'IM Fell English', serif;
+  font-size: clamp(2rem, 4.5vw, 3.1rem);
+  color: #f0ece0; font-weight: 400; line-height: 1.15;
+  margin-bottom: .3rem;
+}
+
+.subtitle {
+  color: var(--muted); font-size: 12.5px; letter-spacing: .07em;
+}
+.subtitle a { color: var(--accent2); text-decoration: none; }
+.subtitle a:hover { text-decoration: underline; }
+
+/* EQ BOX */
+.eq-box {
+  background: var(--bg);
+  border: 1px solid var(--border);
+  border-radius: 4px;
+  padding: .8rem 1.1rem;
+  font-size: 12.5px; color: var(--muted);
+  font-style: italic; margin-bottom: 1.3rem;
+  line-height: 2.1;
+}
+.eq-h { color: var(--accent2); font-style: normal; font-weight: 500; }
+
+/* RAYLEIGH CALLOUT */
+.rayleigh-note {
+  background: #0f1220;
+  border: 1px solid #252f45;
+  border-left: 3px solid var(--accent2);
+  border-radius: 4px;
+  padding: .75rem 1.1rem;
+  font-size: 12.5px; color: var(--muted);
+  margin-bottom: 1.5rem; line-height: 1.8;
+}
+.rayleigh-note strong { color: var(--accent2); }
+.rayleigh-note .eq-inline { color: #f0ece0; font-style: normal; font-weight: 500; }
+
+/* MAIN LAYOUT */
+.main-layout {
+  display: grid;
+  grid-template-columns: 1fr 370px;
+  gap: 1.5rem;
+  align-items: start;
+}
+
+/* PLOTS COLUMN */
+.plots-col { display: flex; flex-direction: column; gap: 1.25rem; }
+
+.plots-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 1.25rem;
+}
+
+.plot-card {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  padding: 1.1rem;
+  display: flex; flex-direction: column; gap: .6rem;
+}
+.plot-card.wide { grid-column: 1 / -1; }
+
+.card-label {
+  font-size: 11.5px; letter-spacing: .13em; text-transform: uppercase;
+  color: var(--muted); display: flex; align-items: center; gap: .5rem;
+}
+.card-label .dot {
+  display: inline-block; width: 9px; height: 9px; border-radius: 50%; flex-shrink: 0;
+}
+.card-title {
+  font-family: 'IM Fell English', serif;
+  font-size: 1.1rem; color: #e8e4da; font-weight: 400;
+}
+
+canvas { width: 100% !important; }
+
+/* LITERATURE SECTION */
+.lit-section {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  padding: 1.1rem;
+}
+.lit-section h3 {
+  font-family: 'IM Fell English', serif;
+  font-size: 1.1rem; color: #f0ece0; font-weight: 400; margin-bottom: .75rem;
+}
+
+.lit-toggles { display: flex; flex-wrap: wrap; gap: .42rem; margin-bottom: .85rem; }
+
+.toggle-btn {
+  font-family: 'DM Mono', monospace;
+  font-size: 11.5px; padding: .3rem .75rem;
+  border-radius: 3px; cursor: pointer;
+  border: 1px solid var(--border);
+  background: transparent; color: var(--muted);
+  transition: all .18s; display: flex; align-items: center; gap: .35rem;
+}
+.toggle-btn.active { color: #0d0f14 !important; border-color: transparent !important; }
+
+table { width: 100%; border-collapse: collapse; font-size: 12px; }
+th {
+  text-align: left; padding: .38rem .55rem;
+  font-size: 10.5px; letter-spacing: .11em; text-transform: uppercase;
+  color: var(--muted); border-bottom: 1px solid var(--border);
+}
+td { padding: .38rem .55rem; border-bottom: 1px solid #1a1d26; }
+tr:last-child td { border-bottom: none; }
+tr:hover td { background: rgba(255,255,255,.02); }
+
+/* SIDEBAR */
+.sidebar { display: flex; flex-direction: column; gap: 1.25rem; }
+
+/* INPUT PANEL */
+.input-panel {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  padding: 1.25rem 1.2rem;
+}
+.input-panel h2 {
+  font-family: 'IM Fell English', serif;
+  font-size: 1.25rem; color: #f0ece0; font-weight: 400; margin-bottom: .2rem;
+}
+.input-panel > p {
+  color: var(--muted); font-size: 12px; margin-bottom: .9rem; line-height: 1.7;
+}
+
+.point-row {
+  display: grid; grid-template-columns: 1fr 1fr;
+  gap: .5rem; margin-bottom: .5rem;
+  background: var(--bg);
+  border: 1px solid var(--border);
+  border-radius: 3px;
+  padding: .5rem .65rem .55rem;
+}
+.point-row-label {
+  grid-column: 1/-1;
+  font-size: 10.5px; color: var(--muted);
+  letter-spacing: .08em; text-transform: uppercase; margin-bottom: .18rem;
+}
+
+.field { display: flex; flex-direction: column; gap: .28rem; }
+
+label {
+  font-size: 11px; letter-spacing: .09em; text-transform: uppercase;
+  color: var(--accent);
+}
+.field small { color: var(--muted); font-size: 11px; }
+
+input[type=number] {
+  background: var(--bg);
+  border: 1px solid var(--border);
+  color: var(--text);
+  font-family: 'DM Mono', monospace;
+  font-size: 13px;
+  padding: .4rem .65rem;
+  border-radius: 3px; width: 100%;
+  transition: border-color .2s;
+}
+input:focus { outline: none; border-color: var(--accent); }
+
+.actions { display: flex; gap: .5rem; flex-wrap: wrap; margin-top: .6rem; }
+
+button {
+  font-family: 'DM Mono', monospace;
+  font-size: 12px; letter-spacing: .09em; text-transform: uppercase;
+  padding: .55rem 1.1rem;
+  border-radius: 3px; cursor: pointer; border: 1px solid;
+  transition: all .18s;
+}
+.btn-primary { background: var(--accent); color: #0d0f14; border-color: var(--accent); }
+.btn-primary:hover { background: #f2d898; }
+.btn-sm { background: transparent; color: var(--muted); border-color: var(--border); font-size: 11px; padding: .38rem .8rem; }
+.btn-sm:hover { border-color: var(--accent2); color: var(--accent2); }
+.btn-danger { background: transparent; color: var(--muted); border-color: var(--border); font-size: 11px; padding: .38rem .8rem; }
+.btn-danger:hover { border-color: #e87a7a; color: #e87a7a; }
+
+.guess-row { display: grid; grid-template-columns: 1fr 1fr; gap: .6rem; margin-top: .8rem; }
+
+/* RESULT BOX */
+.result-box {
+  background: var(--bg);
+  border: 1px solid var(--border);
+  border-left: 3px solid var(--accent);
+  border-radius: 3px;
+  padding: .9rem 1rem;
+  display: none; margin-top: .85rem;
+}
+.result-box.show { display: block; }
+
+.result-box h3 {
+  font-size: 11px; letter-spacing: .15em; text-transform: uppercase;
+  color: var(--accent); margin-bottom: .55rem;
+}
+
+.result-row {
+  display: flex; justify-content: space-between;
+  margin-bottom: .28rem; font-size: 13px;
+}
+.result-row .key { color: var(--muted); }
+.result-row .val { color: #f0ece0; font-weight: 500; }
+
+.param-note {
+  margin-top: .55rem; padding-top: .55rem;
+  border-top: 1px solid var(--border);
+  font-size: 11.5px; color: var(--muted); line-height: 1.7;
+}
+.param-note .pn { display: block; margin-bottom: .2rem; }
+.param-note em { color: var(--accent2); font-style: normal; font-weight: 500; }
+.param-note span.pval { color: var(--text); }
+
+.rayleigh-flag {
+  margin-top: .55rem; padding-top: .55rem;
+  border-top: 1px solid var(--border);
+  font-size: 11.5px; color: var(--accent2);
+  display: none; line-height: 1.7;
+}
+
+.classification {
+  margin-top: .65rem; padding-top: .65rem;
+  border-top: 1px solid var(--border);
+  font-family: 'IM Fell English', serif;
+  font-size: 1.2rem;
+}
+
+footer {
+  border-top: 1px solid var(--border);
+  padding-top: 1.1rem; margin-top: 2rem;
+  color: var(--muted); font-size: 11.5px; letter-spacing: .05em;
+}
+
+@media(max-width: 980px) {
+  .main-layout { grid-template-columns: 1fr; }
+}
+@media(max-width: 600px) {
+  .plots-grid { grid-template-columns: 1fr; }
+  .plot-card.wide { grid-column: 1; }
+}
+</style>
+</head>
+<body>
+<div class="page">
+
+<!-- HEADER -->
+<header>
+  <div class="badge">Weibull Tephra Tool · v2.0</div>
+  <h1>Estimating Plume Height</h1>
+  <p class="subtitle">
+    Bonadonna &amp; Costa (2013) · <em>Bull Volcanol</em> 75:742 ·
+    <a href="https://github.com/tdisando/Weibull_Tephra" target="_blank">github.com/tdisando/Weibull_Tephra</a>
+  </p>
+</header>
+
+<!-- EQ BOX -->
+<div class="eq-box">
+  Weibull form: <span class="eq-h">Y(x) = θ · (x/λ)^(n−2) · exp[−(x/λ)^n]</span>
+  &ensp;|&ensp;
+  <span class="eq-h">λ</span> increases with eruption size &amp; dispersal power
+  &ensp;|&ensp;
+  <span class="eq-h">n</span> controls curve shape: low n → power-law-like · high n → exponential-like
+  &ensp;|&ensp;
+  <span class="eq-h">θ</span> scales the overall magnitude of the deposit property
+  &ensp;|&ensp;
+  Plume height: <span class="eq-h">Ht = 5.01 · λ<sub>ML</sub><sup>0.55</sup></span> (R²=0.93, Eq. 7)
+</div>
+
+<!-- RAYLEIGH NOTE -->
+<div class="rayleigh-note">
+  <strong>Rayleigh Case (n = 2)</strong> — When n = 2 the general law reduces to the Rayleigh form:
+  <span class="eq-inline"> Y(x) = θ · exp[−(x/λ)²]</span>.
+  Applies equally to thickness, max lithic size and Mdϕ, as all share the same Weibull structure.
+  A Rayleigh decay indicates smooth, Gaussian-like thinning consistent with a well-mixed umbrella cloud —
+  typical of Plinian or strong Subplinian eruptions where turbulent mixing dominates over wind distortion and ballistic settling.
+  ★ marks are shown in the table where n ≈ 2.
+</div>
+
+<!-- MAIN LAYOUT -->
+<div class="main-layout">
+
+  <!-- LEFT COLUMN: plots + literature -->
+  <div class="plots-col">
+
+    <div class="plots-grid">
+
+      <!-- Plot I: Thickness -->
+      <div class="plot-card">
+        <div class="card-label">
+          <span class="dot" style="background:var(--accent)"></span>
+          Plot I — Deposit Thinning
+        </div>
+        <div class="card-title">Thickness (cm) vs √Area (km)</div>
+        <canvas id="chartThickness" height="290"></canvas>
+      </div>
+
+      <!-- Plot II: Median grain size -->
+      <div class="plot-card">
+        <div class="card-label">
+          <span class="dot" style="background:var(--accent2)"></span>
+          Plot II — Median Grain Size
+        </div>
+        <div class="card-title">Mdϕ (cm) vs √Area (km)</div>
+        <canvas id="chartMdPhi" height="290"></canvas>
+      </div>
+
+      <!-- Plot III: Max lithic — wide, hosts user overlay -->
+      <div class="plot-card wide">
+        <div class="card-label">
+          <span class="dot" style="background:var(--lava)"></span>
+          Plot III — Max Lithic Size &amp; Plume Height Estimator
+        </div>
+        <div class="card-title">Max. lithic size M<sub>L</sub> (cm) vs √Area (km)</div>
+        <canvas id="chartLithic" height="270"></canvas>
+      </div>
+
+    </div><!-- end plots-grid -->
+
+    <!-- Literature table with toggle -->
+    <div class="lit-section">
+      <h3>Literature Examples — click to activate / deactivate</h3>
+      <div class="lit-toggles" id="litToggles"></div>
+      <table>
+        <thead>
+          <tr>
+            <th></th><th>Eruption</th><th>VEI</th>
+            <th>λ<sub>th</sub></th><th>θ<sub>th</sub></th><th>n<sub>th</sub></th>
+            <th>λ<sub>ML</sub></th><th>θ<sub>ML</sub></th><th>n<sub>ML</sub></th>
+            <th>Ht (km)</th><th>Style</th>
+          </tr>
+        </thead>
+        <tbody id="legendTable"></tbody>
+      </table>
+      <p style="color:var(--muted);font-size:11.5px;margin-top:.6rem;">
+        λ in km · θ in cm · ★ n ≈ 2 (Rayleigh case) · Source: Tables 1 &amp; 4, Bonadonna &amp; Costa (2013)
+      </p>
+    </div>
+
+  </div><!-- end plots-col -->
+
+  <!-- RIGHT SIDEBAR: input + results -->
+  <div class="sidebar">
+    <div class="input-panel">
+      <h2>Plume Height Estimator</h2>
+      <p>
+        Enter max lithic clast size (cm) at each √isopleth area (km).
+        Fits Weibull curve → derives λ<sub>ML</sub> → estimates Ht via Eq. 7.
+        Minimum 3 points required.
+      </p>
+
+      <div id="pointRows"></div>
+
+      <div class="actions">
+        <button class="btn-sm" onclick="addRow()">+ Point</button>
+        <button class="btn-danger" onclick="removeRow()">− Remove</button>
+      </div>
+
+      <div class="guess-row">
+        <div class="field">
+          <label>θ<sub>ML</sub> guess</label>
+          <input type="number" id="thetaGuess" value="5" step="0.1">
+          <small>cm · range 1–20</small>
+        </div>
+        <div class="field">
+          <label>n guess</label>
+          <input type="number" id="nGuess" value="1.5" step="0.1">
+          <small>range 0.5–2.0</small>
+        </div>
+      </div>
+
+      <div class="actions" style="margin-top:.9rem;">
+        <button class="btn-primary" onclick="fitAndPlot()">Fit &amp; Estimate Ht</button>
+        <button class="btn-sm" onclick="clearUser()">Clear</button>
+      </div>
+
+      <!-- RESULT -->
+      <div class="result-box" id="resultBox">
+        <h3>Fitted Parameters &amp; Result</h3>
+
+        <div class="result-row">
+          <span class="key">λ<sub>ML</sub> (dispersal scale)</span>
+          <span class="val" id="resLambda">—</span>
+        </div>
+        <div class="result-row">
+          <span class="key">θ<sub>ML</sub> (magnitude scale)</span>
+          <span class="val" id="resTheta">—</span>
+        </div>
+        <div class="result-row">
+          <span class="key">n (shape)</span>
+          <span class="val" id="resN">—</span>
+        </div>
+        <div class="result-row" style="margin-top:.4rem; padding-top:.4rem; border-top:1px solid var(--border)">
+          <span class="key">Plume height Ht</span>
+          <span class="val" id="resHt">—</span>
+        </div>
+        <div class="result-row">
+          <span class="key">Ht ± 25 % range</span>
+          <span class="val" id="resHtRange">—</span>
+        </div>
+
+        <div class="param-note">
+          <span class="pn" id="noteL"></span>
+          <span class="pn" id="noteN"></span>
+          <span class="pn" id="noteT"></span>
+        </div>
+
+        <div class="rayleigh-flag" id="rayleighFlag">
+          ★ n ≈ 2 — Rayleigh case: smooth Gaussian-like thinning. Well-mixed umbrella cloud.
+          Consistent with Plinian / strong Subplinian dynamics.
+        </div>
+
+        <div class="classification" id="resClass"></div>
+      </div><!-- end result-box -->
+
+    </div><!-- end input-panel -->
+  </div><!-- end sidebar -->
+
+</div><!-- end main-layout -->
+
+<footer>
+  Bonadonna C &amp; Costa A (2013) <em>Bull Volcanol</em> 75:742 · DOI 10.1007/s00445-013-0742-1 ·
+  Tool by T. Disando · Parameters from Tables 1 &amp; 4
+</footer>
+
+</div><!-- end page -->
+
+<script>
+// ── DATA ─────────────────────────────────────────────────────────────────────
+const ERUPTIONS = [
+  {
+    name: "Averno 2-A2",        vei: 3,
+    lth: 3.1,   tth: 194.7, nth: 2.0,
+    lML: 3.4,   tML: 6.9,   nML: 1.6,
+    ht: 10.0, style: "Small–Moderate", color: "#7ab8e8"
+  },
+  {
+    name: "Vesuvius 512 U5top", vei: 3,
+    lth: 5.6,   tth: 42.1,  nth: 1.9,
+    lML: 7.9,   tML: 3.7,   nML: 2.0,
+    ht: 15.0, style: "Subplinian", color: "#e8c87a"
+  },
+  {
+    name: "Cotopaxi L3",        vei: 4,
+    lth: 15.7,  tth: 192.0, nth: 1.7,
+    lML: 15.3,  tML: 6.8,   nML: 1.5,
+    ht: 23.0, style: "Subplinian → Plinian", color: "#e87a4a"
+  },
+  {
+    name: "Novarupta C 1912",   vei: 6,
+    lth: 62.6,  tth: 26.1,  nth: 0.8,
+    lML: 17.2,  tML: 10.7,  nML: 1.8,
+    ht: 25.0, style: "Plinian", color: "#e87a9a"
+  },
+  {
+    name: "Pinatubo 1991",      vei: 6,
+    lth: 229.6, tth: 3.3,   nth: 1.2,
+    lML: 53.8,  tML: 3.1,   nML: 1.8,
+    ht: 40.0, style: "Plinian → Ultraplinian", color: "#c47ae8"
+  },
+];
+
+const MDPHI = [
+  { name: "Cotopaxi L3",   lMdp: 23.5, tMdp: 0.6, nMdp: 1.0, color: "#e87a4a" },
+  { name: "Hatepe 186AD",  lMdp: 58.9, tMdp: 0.4, nMdp: 1.1, color: "#e8c87a" },
+  { name: "Tarawera 1886", lMdp: 42.9, tMdp: 0.5, nMdp: 1.7, color: "#e87a9a" },
+  { name: "Pululagua",     lMdp: 30.4, tMdp: 0.3, nMdp: 1.0, color: "#c47ae8" },
+  { name: "Waimihia",      lMdp: 65.0, tMdp: 0.7, nMdp: 1.4, color: "#7ab8e8" },
+];
+
+const activeState = ERUPTIONS.map(() => true);
+
+// ── WEIBULL ───────────────────────────────────────────────────────────────────
+function weibull(x, theta, lambda, n) {
+  if (x <= 0) return theta;
+  return theta * Math.pow(x / lambda, n - 2) * Math.exp(-Math.pow(x / lambda, n));
+}
+
+function weibullPoints(theta, lambda, n, xMax, steps = 150) {
+  const pts = [];
+  for (let i = 0; i <= steps; i++) {
+    const x = (xMax * i) / steps;
+    const y = weibull(x, theta, lambda, n);
+    if (y > 1e-4) pts.push({ x, y });
+  }
+  return pts;
+}
+
+// ── CHART OPTIONS ─────────────────────────────────────────────────────────────
+function chartOpts(yLabel, xMax) {
+  const scales = {
+    x: {
+      type: 'linear',
+      title: { display: true, text: '√Area (km)', color: '#5a606e', font: { family: 'DM Mono', size: 12 } },
+      grid: { color: '#1a1d26' },
+      ticks: { color: '#5a606e', font: { family: 'DM Mono', size: 11 } }
+    },
+    y: {
+      type: 'logarithmic',
+      title: { display: true, text: yLabel, color: '#5a606e', font: { family: 'DM Mono', size: 12 } },
+      grid: { color: '#1a1d26' },
+      ticks: {
+        color: '#5a606e', font: { family: 'DM Mono', size: 11 },
+        callback: v => +v.toPrecision(2)
+      }
+    }
+  };
+  if (xMax) scales.x.max = xMax;
+  return {
+    responsive: true, scales,
+    plugins: {
+      legend: { labels: { color: '#8a8f9e', font: { family: 'DM Mono', size: 11 }, boxWidth: 12 } },
+      tooltip: {
+        backgroundColor: '#13161e', borderColor: '#252932', borderWidth: 1,
+        titleFont: { family: 'DM Mono', size: 12 }, bodyFont: { family: 'DM Mono', size: 11 },
+        titleColor: '#e8c87a', bodyColor: '#c8ccda',
+        callbacks: { label: ctx => ` ${ctx.dataset.label}: (${ctx.parsed.x.toFixed(1)}, ${ctx.parsed.y.toFixed(3)})` }
+      }
+    },
+    animation: { duration: 500, easing: 'easeInOutQuart' }
+  };
+}
+
+// ── BUILD CHARTS ─────────────────────────────────────────────────────────────
+let chartTh, chartML, chartMdPhi;
+
+function buildThickness() {
+  const datasets = ERUPTIONS.map((e, i) => ({
+    label: e.name,
+    data: weibullPoints(e.tth, e.lth, e.nth, Math.max(e.lth * 4.5, 30)),
+    borderColor: e.color, backgroundColor: 'transparent',
+    borderWidth: 2, pointRadius: 0, tension: 0.35
+  }));
+  chartTh = new Chart(document.getElementById('chartThickness'), {
+    type: 'line', data: { datasets }, options: chartOpts('Thickness (cm)')
+  });
+}
+
+function buildLithic() {
+  const datasets = ERUPTIONS.map((e, i) => ({
+    label: e.name,
+    data: weibullPoints(e.tML, e.lML, e.nML, e.lML * 5.5),
+    borderColor: e.color, backgroundColor: 'transparent',
+    borderWidth: 2, pointRadius: 0, tension: 0.35
+  }));
+  datasets.push({
+    label: '◆ Your fit',
+    data: [], borderColor: '#ffffff', backgroundColor: 'transparent',
+    borderWidth: 2.5, pointRadius: 0, borderDash: [5, 4], tension: 0.35
+  });
+  datasets.push({
+    label: '◆ Your data',
+    data: [], borderColor: 'transparent', backgroundColor: '#ffffff',
+    pointRadius: 6, pointHoverRadius: 8, showLine: false, type: 'scatter'
+  });
+  chartML = new Chart(document.getElementById('chartLithic'), {
+    type: 'line', data: { datasets }, options: chartOpts('Max. lithic size (cm)')
+  });
+}
+
+function buildMdPhi() {
+  const datasets = MDPHI.map(e => ({
+    label: e.name,
+    data: weibullPoints(e.tMdp, e.lMdp, e.nMdp, e.lMdp * 4.2),
+    borderColor: e.color, backgroundColor: 'transparent',
+    borderWidth: 2, pointRadius: 0, tension: 0.35
+  }));
+  chartMdPhi = new Chart(document.getElementById('chartMdPhi'), {
+    type: 'line', data: { datasets }, options: chartOpts('Mdϕ (cm)', 220)
+  });
+}
+
+// ── TOGGLES ───────────────────────────────────────────────────────────────────
+function buildToggles() {
+  const c = document.getElementById('litToggles');
+  ERUPTIONS.forEach((e, i) => {
+    const btn = document.createElement('button');
+    btn.className = 'toggle-btn active';
+    btn.id = `tog${i}`;
+    btn.style.cssText = `background:${e.color};color:#0d0f14;border-color:${e.color}`;
+    btn.textContent = e.name;
+    btn.addEventListener('click', () => toggleEruption(i));
+    c.appendChild(btn);
+  });
+}
+
+function toggleEruption(i) {
+  activeState[i] = !activeState[i];
+  const btn = document.getElementById(`tog${i}`);
+  const e   = ERUPTIONS[i];
+  if (activeState[i]) {
+    btn.classList.add('active');
+    btn.style.cssText = `background:${e.color};color:#0d0f14;border-color:${e.color}`;
+  } else {
+    btn.classList.remove('active');
+    btn.style.cssText = `background:transparent;color:${e.color};border-color:${e.color}`;
+  }
+  refreshCharts();
+}
+
+function refreshCharts() {
+  chartTh.data.datasets.forEach((ds, i) => {
+    if (i >= ERUPTIONS.length) return;
+    const e = ERUPTIONS[i];
+    ds.data = activeState[i] ? weibullPoints(e.tth, e.lth, e.nth, Math.max(e.lth * 4.5, 30)) : [];
+  });
+  chartML.data.datasets.forEach((ds, i) => {
+    if (i >= ERUPTIONS.length) return;
+    const e = ERUPTIONS[i];
+    ds.data = activeState[i] ? weibullPoints(e.tML, e.lML, e.nML, e.lML * 5.5) : [];
+  });
+  chartTh.update();
+  chartML.update();
+}
+
+// ── LEGEND TABLE ─────────────────────────────────────────────────────────────
+function buildLegendTable() {
+  const tbody = document.getElementById('legendTable');
+  ERUPTIONS.forEach((e, i) => {
+    const rTh = Math.abs(e.nth - 2) < 0.15 ? ' ★' : '';
+    const rML = Math.abs(e.nML - 2) < 0.15 ? ' ★' : '';
+    tbody.innerHTML += `<tr>
+      <td><span style="display:inline-block;width:10px;height:10px;border-radius:50%;background:${e.color}"></span></td>
+      <td style="color:${e.color}">${e.name}</td>
+      <td>${e.vei}</td>
+      <td>${e.lth}</td><td>${e.tth}</td>
+      <td>${e.nth}<span style="color:var(--accent2)">${rTh}</span></td>
+      <td>${e.lML}</td><td>${e.tML}</td>
+      <td>${e.nML}<span style="color:var(--accent2)">${rML}</span></td>
+      <td>${e.ht}</td>
+      <td style="color:${e.color};font-size:11px">${e.style}</td>
+    </tr>`;
+  });
+}
+
+// ── INPUT ROWS ────────────────────────────────────────────────────────────────
+let rowCount = 0;
+
+function addRow(sqrtA = '', ML = '') {
+  rowCount++;
+  const div = document.createElement('div');
+  div.className = 'point-row'; div.id = `row${rowCount}`;
+  div.innerHTML = `
+    <div class="point-row-label">Point ${rowCount}</div>
+    <div class="field" style="margin-bottom:0">
+      <label style="font-size:10.5px">√Area (km)</label>
+      <input type="number" class="sqrtA" value="${sqrtA}" placeholder="e.g. 5.2" step="0.1" min="0">
+    </div>
+    <div class="field" style="margin-bottom:0">
+      <label style="font-size:10.5px">M<sub>L</sub> (cm)</label>
+      <input type="number" class="mlVal" value="${ML}" placeholder="e.g. 8.5" step="0.01" min="0">
+    </div>`;
+  document.getElementById('pointRows').appendChild(div);
+}
+
+function removeRow() {
+  if (rowCount < 1) return;
+  const el = document.getElementById(`row${rowCount}`);
+  if (el) el.remove();
+  rowCount--;
+}
+
+function clearUser() {
+  document.getElementById('pointRows').innerHTML = ''; rowCount = 0;
+  document.getElementById('resultBox').classList.remove('show');
+  const N = ERUPTIONS.length;
+  chartML.data.datasets[N].data = [];
+  chartML.data.datasets[N+1].data = [];
+  chartML.update();
+  addRow(2.0,12.0); addRow(5.5,4.2); addRow(10.0,1.8); addRow(20.0,0.5);
+}
+
+// ── FITTING ───────────────────────────────────────────────────────────────────
+function fitWeibull(points) {
+  let theta  = parseFloat(document.getElementById('thetaGuess').value) || 5;
+  let lambda = points.reduce((a,p)=>a+p.x,0)/points.length || 10;
+  let n      = parseFloat(document.getElementById('nGuess').value) || 1.5;
+
+  for (let iter = 0; iter < 10000; iter++) {
+    let dT=0, dL=0, dN=0;
+    for (const p of points) {
+      const pred = weibull(p.x, theta, lambda, n);
+      if (pred <= 0) continue;
+      const e = Math.log(pred) - Math.log(p.y);
+      const eps = 1e-5;
+      dT += 2*e*(Math.log(weibull(p.x,theta+eps,lambda,n))-Math.log(pred))/eps;
+      dL += 2*e*(Math.log(weibull(p.x,theta,lambda+eps,n))-Math.log(pred))/eps;
+      dN += 2*e*(Math.log(weibull(p.x,theta,lambda,n+eps))-Math.log(pred))/eps;
+    }
+    const step = 0.001/(1+iter*0.0003);
+    theta  = Math.max(0.1,  theta  - step*dT);
+    lambda = Math.max(0.5,  lambda - step*dL);
+    n      = Math.max(0.3, Math.min(3.0, n - step*dN));
+  }
+  return {theta, lambda, n};
+}
+
+// ── CLASSIFY ─────────────────────────────────────────────────────────────────
+function classify(ht) {
+  if (ht < 14) return { label:"Small–Moderate Explosive", color:"#7ab8e8" };
+  if (ht < 24) return { label:"Subplinian",               color:"#e8c87a" };
+  if (ht < 41) return { label:"Plinian",                  color:"#e87a4a" };
+  return          { label:"Ultraplinian",                  color:"#c47ae8" };
+}
+
+// ── FIT AND PLOT ─────────────────────────────────────────────────────────────
+function fitAndPlot() {
+  const sqrtAs = [...document.querySelectorAll('.sqrtA')].map(i=>parseFloat(i.value));
+  const mls    = [...document.querySelectorAll('.mlVal')].map(i=>parseFloat(i.value));
+  const points = sqrtAs.map((x,i)=>({x,y:mls[i]}))
+                        .filter(p=>!isNaN(p.x)&&!isNaN(p.y)&&p.x>0&&p.y>0);
+
+  if (points.length < 3) { alert('Please enter at least 3 valid data points.'); return; }
+
+  const {theta, lambda, n} = fitWeibull(points);
+  const ht  = 5.01 * Math.pow(lambda, 0.55);
+  const cls = classify(ht);
+
+  // update Plot III
+  const xMax = Math.max(...points.map(p=>p.x)) * 1.6;
+  const N = ERUPTIONS.length;
+  chartML.data.datasets[N].data   = weibullPoints(theta, lambda, n, xMax);
+  chartML.data.datasets[N+1].data = points;
+  chartML.update();
+
+  document.getElementById('resLambda').textContent  = lambda.toFixed(2)+' km';
+  document.getElementById('resTheta').textContent   = theta.toFixed(3)+' cm';
+  document.getElementById('resN').textContent       = n.toFixed(3);
+  document.getElementById('resHt').textContent      = ht.toFixed(1)+' km';
+  document.getElementById('resHtRange').textContent = `${(ht*0.75).toFixed(1)} – ${(ht*1.25).toFixed(1)} km`;
+
+  // parameter interpretations
+  const lambdaNote = lambda < 10  ? 'small localised dispersal (small–moderate eruption scale)'
+                   : lambda < 50  ? 'moderate dispersal — Subplinian to Plinian range'
+                   :                'large dispersal — major Plinian or Ultraplinian scale';
+  const nNote      = n < 0.8 ? 'power-law-like decay: gradual far-field thinning'
+                   : n > 1.7 ? 'exponential-like decay: sharp thinning near source'
+                   :           'intermediate decay — balanced near/far-field behaviour';
+  const thetaNote  = 'magnitude scalar — larger θ → thicker or coarser deposit overall';
+
+  document.getElementById('noteL').innerHTML = `<em>λ</em> <span class="pval">→ ${lambdaNote}</span>`;
+  document.getElementById('noteN').innerHTML = `<em>n</em> <span class="pval">→ ${nNote}</span>`;
+  document.getElementById('noteT').innerHTML = `<em>θ</em> <span class="pval">→ ${thetaNote}</span>`;
+
+  document.getElementById('rayleighFlag').style.display = Math.abs(n-2)<0.22 ? 'block' : 'none';
+
+  const classEl = document.getElementById('resClass');
+  classEl.style.color = cls.color;
+  classEl.textContent = '→ ' + cls.label;
+
+  document.getElementById('resultBox').classList.add('show');
+}
+
+// ── INIT ─────────────────────────────────────────────────────────────────────
+window.addEventListener('DOMContentLoaded', () => {
+  buildThickness();
+  buildLithic();
+  buildMdPhi();
+  buildToggles();
+  buildLegendTable();
+  addRow(2.0,12.0); addRow(5.5,4.2); addRow(10.0,1.8); addRow(20.0,0.5);
+});
+</script>
+</body>
+</html>
